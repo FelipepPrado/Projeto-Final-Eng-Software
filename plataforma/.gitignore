@@ -1,0 +1,9 @@
+#Ignorar arquivos de compilação do Java
+**/target/
+
+#Ignorar arquivos temporários e caches do Python
+__pycache/
+*.pyc
+
+#Ignorar variáveis de ambiente locais/secretas (se houver)
+.env
