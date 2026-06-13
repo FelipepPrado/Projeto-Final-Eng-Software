@@ -7,12 +7,12 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test-auth:
+  test-auth-service:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
         uses: actions/checkout@v3
-        
+      
       - name: Configurar Python
         uses: actions/setup-python@v4
         with:
@@ -22,13 +22,26 @@ jobs:
         working-directory: ./services/auth-service
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 pytest safety
-          # flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          echo "Linting finalizado"
+          pip install -r requirements.txt flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           
-      - name: Rodar Testes Unitários e Segurança
+      - name: Rodar Testes Unitários
         working-directory: ./services/auth-service
-        run: |
-          # safety check
-          # pytest
-          echo "Testes e verificações de segurança executados"
+        run: pytest
+
+  test-academic-service:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+        
+      - name: Configurar Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Construir e Testar (Maven)
+        working-directory: ./services/academic-service
+        # O Maven já baixa as dependências e roda os testes automaticamente
+        run: mvn clean test
