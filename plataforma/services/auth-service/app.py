@@ -1,28 +1,49 @@
+import sqlite3
 from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-# Endpoint básico para o Health Check (útil para testes e observabilidade no futuro)
+def get_db_connection():
+    conn = sqlite3.connect('auth.db')
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT,
+            email TEXT,
+            tipo TEXT
+        );
+    ''')
+    
+    cur.execute('SELECT COUNT(*) FROM usuarios;')
+    if cur.fetchone()[0] == 0:
+        cur.execute("INSERT INTO usuarios (id, nome, email, tipo) VALUES (1, 'Carlos', 'carlos@ifce.edu.br', 'ALUNO')")
+        cur.execute("INSERT INTO usuarios (id, nome, email, tipo) VALUES (2, 'Prof. Ana', 'ana@ifce.edu.br', 'PROFESSOR')")
+    
+    conn.commit()
+    conn.close()
+
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "Auth Service funcionando perfeitamente!"}), 200
+    return jsonify({"status": "Auth Service conectado ao SQLite!"}), 200
 
-# Endpoint REST que o academic-service vai consumir depois
 @app.route('/api/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
-    # Simulando um banco de dados temporário para a Sprint 2
-    banco_de_usuarios = {
-        1: {"id": 1, "nome": "Carlos", "email": "carlos@ifce.edu.br", "tipo": "ALUNO"},
-        2: {"id": 2, "nome": "Prof. Ana", "email": "ana@ifce.edu.br", "tipo": "PROFESSOR"}
-    }
-    
-    usuario = banco_de_usuarios.get(user_id)
+    conn = get_db_connection()
+    usuario = conn.execute('SELECT * FROM usuarios WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
     
     if usuario:
-        return jsonify(usuario), 200
+        return jsonify(dict(usuario)), 200
     else:
         return jsonify({"erro": "Usuário não encontrado"}), 404
 
 if __name__ == '__main__':
-    # Roda na porta 8081, que é a mesma que mapeamos no docker-compose
+    init_db()
     app.run(host='0.0.0.0', port=8081)

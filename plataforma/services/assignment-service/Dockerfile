@@ -1,4 +1,7 @@
 FROM python:3.9-slim
 WORKDIR /app
-# Comando genérico para manter o container em pé na Sprint 1
-CMD ["python", "-c", "import time; print('Assignment Service Iniciado'); time.sleep(3600)"]
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY app.py .
+EXPOSE 8083
+CMD ["python", "app.py"]
