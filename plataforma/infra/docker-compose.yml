@@ -1,4 +1,12 @@
 services:
+  frontend-web:
+    build: 
+      context: ../services/frontend-web
+    ports:
+      - "8080:80" # Acessaremos o React na porta 8080
+    depends_on:
+      - assignment-service
+
   auth-service:
     build: 
       context: ../services/auth-service
