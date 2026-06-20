@@ -24,13 +24,13 @@ def test_health_check(client):
     dados = json.loads(resposta.data)
     assert dados["status"] == "Auth Service conectado ao SQLite!"
 
-# Teste 2: Verifica a busca por um utilizador existente (Carlos, ID 1)
+# Teste 2: Verifica a busca por um utilizador existente (Pedro, ID 1)
 def test_get_user_sucesso(client):
     resposta = client.get('/api/users/1')
     assert resposta.status_code == 200
     
     dados = json.loads(resposta.data)
-    assert dados["nome"] == "Carlos"
+    assert dados["nome"] == "Pedro"
     assert dados["tipo"] == "ALUNO"
 
 # Teste 3: Verifica o comportamento para um utilizador inexistente (Erro 404)

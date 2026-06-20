@@ -1,13 +1,13 @@
 import sqlite3
 import requests
-from flask import Flask, jsonify
-from flask_cors import CORS # Adicione esta linha
+from flask import Flask, jsonify, request 
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
 def get_db_connection():
-    conn = sqlite3.connect('assignment.db')
+    conn = sqlite3.connect('assignment.db') 
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -48,7 +48,7 @@ def get_user_assignments(user_id):
             dados_usuario = resposta_auth.json()
             
             conn = get_db_connection()
-            tarefas = conn.execute('SELECT disciplina, titulo, status FROM tarefas WHERE usuario_id = ?', (user_id,)).fetchall()
+            tarefas = conn.execute('SELECT id,disciplina, titulo, status FROM tarefas WHERE usuario_id = ?', (user_id,)).fetchall()
             conn.close()
             
             return jsonify({
@@ -62,6 +62,37 @@ def get_user_assignments(user_id):
             
     except requests.exceptions.RequestException as e:
         return jsonify({"erro": "Falha na comunicação com o Auth Service", "detalhes": str(e)}), 500
+
+
+@app.route('/api/assignments', methods=['POST'])
+def create_assignment():
+    dados = request.get_json()
+    
+    if not dados or not dados.get('aluno_id') or not dados.get('disciplina') or not dados.get('titulo'):
+        return jsonify({"erro": "Faltam campos obrigatórios"}), 400
+
+    conn = get_db_connection() 
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO tarefas (usuario_id, disciplina, titulo, status) 
+            VALUES (?, ?, ?, 'Pendente')
+        ''', (dados['aluno_id'], dados['disciplina'], dados['titulo']))
+        conn.commit()
+        return jsonify({"mensagem": "Tarefa adicionada com sucesso!"}), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/assignments/<int:tarefa_id>/status', methods=['PATCH'])
+def update_status(tarefa_id):
+    conn = get_db_connection()
+    conn.execute("UPDATE tarefas SET status = 'Entregue' WHERE id = ?", (tarefa_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"mensagem": "Status atualizado!"}), 200
+
 
 if __name__ == '__main__':
     init_db()
