@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react'
+import Login from './components/Login';
 import './App.css'
+import Cadastro from './components/Cadastro';
 
 function App() {
+  // 1. ESTADO DE LOGIN (O que estava faltando!)
+  const [usuarioLogado, setUsuarioLogado] = useState(null)
+  const [abaNaoLogada, setAbaNaoLogada] = useState('login'); // 'login' ou 'cadastro'
+
   // Controle do Aluno logado/visualizado
   const [alunoIdAtivo, setAlunoIdAtivo] = useState(1)
   const [inputBuscaId, setInputBuscaId] = useState('1')
@@ -16,6 +22,16 @@ function App() {
   const [novaDisciplina, setNovaDisciplina] = useState('')
   const [novoTitulo, setNovoTitulo] = useState('')
 
+  // 2. RECUPERA SESSÃO AO DAR F5
+  useEffect(() => {
+    const usuarioSalvo = localStorage.getItem('usuario');
+    if (usuarioSalvo) {
+      const usuario = JSON.parse(usuarioSalvo);
+      setUsuarioLogado(usuario);
+      setAlunoIdAtivo(usuario.id);
+    }
+  }, []);
+
   const buscarDadosDoAluno = (id) => {
     setCarregando(true)
     fetch(`http://localhost:8083/api/assignments/${id}`)
@@ -27,8 +43,23 @@ function App() {
       .catch(() => { setDados(null); setCarregando(false) })
   }
 
-  // Busca os dados sempre que o ID ativo mudar
-  useEffect(() => { buscarDadosDoAluno(alunoIdAtivo) }, [alunoIdAtivo])
+  // Busca os dados sempre que o ID ativo mudar (e somente se estiver logado)
+  useEffect(() => { 
+    if (usuarioLogado) buscarDadosDoAluno(alunoIdAtivo) 
+  }, [alunoIdAtivo, usuarioLogado])
+
+  const handleLoginSucesso = (dadosUsuario) => {
+    setUsuarioLogado(dadosUsuario);
+    setAlunoIdAtivo(dadosUsuario.id);
+    localStorage.setItem('usuario', JSON.stringify(dadosUsuario));
+  };
+
+  // 3. FUNÇÃO DE SAIR (LOGOUT)
+  const handleLogout = () => {
+    localStorage.removeItem('usuario');
+    setUsuarioLogado(null);
+    setDados(null);
+  };
 
   const handleCriarPessoa = async (e) => {
     e.preventDefault()
@@ -45,7 +76,7 @@ function App() {
         setNovoNome(''); setNovoEmail('')
         setAlunoIdAtivo(data.id)
         setInputBuscaId(data.id.toString())
-      } else if (res.status === 409) { // <--- AQUI TRATAMOS O WARNING
+      } else if (res.status === 409) {
         alert("Atenção: " + data.erro)
       } else {
         alert("Erro: " + data.erro)
@@ -53,7 +84,6 @@ function App() {
     } catch (err) { alert('Erro ao conectar com Auth Service') }
   }
 
-  // Dispara o POST para o Assignment Service
   const handleCriarTarefa = async (e) => {
     e.preventDefault()
     try {
@@ -78,33 +108,56 @@ function App() {
       const resposta = await fetch(`http://localhost:8083/api/assignments/${tarefaId}/status`, {
         method: 'PATCH'
       });
-      
-      if (resposta.ok) {
-        buscarDadosDoAluno(alunoIdAtivo); 
-      }
-    } catch (error) {
-      console.error("Erro ao atualizar status:", error);
-    }
+      if (resposta.ok) buscarDadosDoAluno(alunoIdAtivo); 
+    } catch (error) { console.error("Erro ao atualizar status:", error); }
   };
 
+    if (!usuarioLogado) {
+      if (abaNaoLogada === 'cadastro') {
+        return (
+          <Cadastro 
+            onCadastroSuccess={handleLoginSucesso} 
+            aoClicarEmVoltar={() => setAbaNaoLogada('login')} 
+          />
+        );
+      }
+
+      return (
+        <Login 
+          onLoginSuccess={handleLoginSucesso} 
+          aoClicarEmCadastro={() => setAbaNaoLogada('cadastro')} 
+        />
+      );
+    }
+
+  // --- SE PASSOU PELO IF ACIMA, MOSTRA O PORTAL ---
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif', maxWidth: '900px', margin: '0 auto' }}>
       
-      {/* BARRA SUPERIOR: TROCAR DE ALUNO */}
+      {/* BARRA SUPERIOR COM BOTÃO DE LOGOUT */}
       <div style={{ background: '#1f1f1f', padding: '10px 20px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ margin: 0, color: '#646cff' }}>Portal Acadêmico</h3>
-        <div>
-          <label style={{ fontSize: '14px', marginRight: '8px',color:'#FFFFFF' }}>Visualizar Aluno (ID):</label>
-          <input 
-            type="number" 
-            value={inputBuscaId} 
-            onChange={(e) => setInputBuscaId(e.target.value)}
-            style={{ width: '50px', padding: '4px', borderRadius: '4px', border: '1px solid #555', background: '#333', color: '#FFFFFF' }}
-          />
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div>
+            <label style={{ fontSize: '14px', marginRight: '8px', color:'#FFFFFF' }}>Visualizar Aluno (ID):</label>
+            <input 
+              type="number" 
+              value={inputBuscaId} 
+              onChange={(e) => setInputBuscaId(e.target.value)}
+              style={{ width: '50px', padding: '4px', borderRadius: '4px', border: '1px solid #555', background: '#333', color: '#FFFFFF' }}
+            />
+            <button 
+              onClick={() => setAlunoIdAtivo(parseInt(inputBuscaId))}
+              style={{ marginLeft: '8px', padding: '5px 12px', background: '#646cff', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}>
+              Buscar
+            </button>
+          </div>
+
           <button 
-            onClick={() => setAlunoIdAtivo(parseInt(inputBuscaId))}
-            style={{ marginLeft: '8px', padding: '5px 12px', background: '#646cff', border: 'none', borderRadius: '4px', color: '#fff', cursor: 'pointer' }}>
-            Buscar
+            onClick={handleLogout}
+            style={{ background: '#d32f2f', color: '#fff', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Sair
           </button>
         </div>
       </div>
@@ -162,8 +215,6 @@ function App() {
 
       {/* RODAPÉ: OS DOIS FORMULÁRIOS DE CADASTRO */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '40px', textAlign: 'left' }}>
-        
-        {/* FORM 1 */}
         <form onSubmit={handleCriarPessoa} style={{ background: '#1a1a1a', color: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #333' }}>
           <h4 style={{ margin: '0 0 15px 0', color: '#74c69d' }}>+ Cadastrar Nova Pessoa</h4>
           <input required placeholder="Nome Completo" value={novoNome} onChange={e => setNovoNome(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing:'border-box', background:'#222', border:'1px solid #444', color:'#ffffff', borderRadius:'4px' }} />
@@ -171,7 +222,6 @@ function App() {
           <button type="submit" style={{ width: '100%', padding: '10px', background: '#1b4332', color: '#74c69d', fontWeight:'bold', border:'none', borderRadius:'4px', cursor:'pointer' }}>Criar Pessoa</button>
         </form>
 
-        {/* FORM 2 */}
         <form onSubmit={handleCriarTarefa} style={{ background: '#1a1a1a', color: '#ffffff', padding: '20px', borderRadius: '8px', border: '1px solid #333' }}>
           <h4 style={{ margin: '0 0 15px 0', color: '#ffb703' }}>+ Atribuir Tarefa ao ID ({alunoIdAtivo})</h4>
           <input required placeholder="Nome da Disciplina" value={novaDisciplina} onChange={e => setNovaDisciplina(e.target.value)} style={{ width: '100%', marginBottom: '10px', padding: '8px', boxSizing:'border-box', background:'#222', border:'1px solid #444', color:'#ffffff', borderRadius:'4px' }} />
