@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const ASSIGN_API = import.meta.env.VITE_ASSIGN_API || 'http://127.0.0.1:8083';
+const ASSIGN_API = import.meta.env.VITE_ASSIGN_API;
 
 export default function HomeAluno({ usuario, onLogout }) {
   const [tarefas, setTarefas] = useState([]);
