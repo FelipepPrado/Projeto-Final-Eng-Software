@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+// Adicionamos a mesma variável de ambiente que usamos no Cadastro!
+const AUTH_API = import.meta.env.VITE_AUTH_API || 'http://localhost:8081';
+
 export default function Login({ onLoginSuccess, aoClicarEmCadastro }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -12,7 +15,8 @@ export default function Login({ onLoginSuccess, aoClicarEmCadastro }) {
     setCarregando(true);
 
     try {
-      const res = await fetch('http://localhost:8081/api/login', {
+      // Atualizamos a URL para usar a nossa variável dinâmica
+      const res = await fetch(`${AUTH_API}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, senha })
