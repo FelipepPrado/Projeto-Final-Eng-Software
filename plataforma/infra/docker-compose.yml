@@ -3,14 +3,14 @@ services:
     build: 
       context: ../services/frontend-web
     ports:
-      - "8080:80" # Acessaremos o React na porta 8080
+      - "8080:80" 
     depends_on:
       - assignment-service
 
   auth-service:
     build: ../services/auth-service
     ports:
-      - "8081:5000"  # <--- [PORTA DO SEU PC] : [PORTA INTERNA DO PYTHON]
+      - "8081:8081"  
 
   academic-service:
     build: 
