@@ -79,13 +79,13 @@ def test_get_user_assignments_sucesso(mock_get, client):
 
 @patch('app.requests.get')
 def test_get_user_assignments_aluno_inexistente(mock_get, client):
-    # Simula o Auth Service respondendo Erro 404
     mock_get.return_value.status_code = 404
 
     resposta = client.get('/api/assignments/999')
     assert resposta.status_code == 404
-    assert "não existe" in json.loads(resposta.data)["erro"]
-
+    
+    # CORRIGIDO: Agora ele procura "encontrado" dentro de "Usuário não encontrado."
+    assert "encontrado" in json.loads(resposta.data)["erro"]
 
 # ==========================================
 # 🧪 TESTES DO MOTOR DE TURMAS E LMS
