@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const AUTH_API = import.meta.env.VITE_AUTH_API || 'http://127.0.0.1:8081';
+const AUTH_API = import.meta.env.VITE_AUTH_API;
 
 export default function Cadastro({ onCadastroSuccess, aoClicarEmVoltar }) {
   const [nome, setNome] = useState('');

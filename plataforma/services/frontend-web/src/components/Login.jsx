@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 // Adicionamos a mesma variável de ambiente que usamos no Cadastro!
-const AUTH_API = import.meta.env.VITE_AUTH_API || 'http://localhost:8081';
+const AUTH_API = import.meta.env.VITE_AUTH_API;
 
 export default function Login({ onLoginSuccess, aoClicarEmCadastro }) {
   const [email, setEmail] = useState('');
