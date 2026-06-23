@@ -5,8 +5,10 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+DB_PATH = '/tmp/auth.db'
+
 def get_db_connection():
-    conn = sqlite3.connect('auth.db')
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -14,53 +16,42 @@ def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
     
+    # SQL ATUALIZADO: Ganhou a coluna "matricula" na penúltima linha
     cur.execute('''
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome TEXT,
             email TEXT UNIQUE,
             senha TEXT,
-            tipo TEXT
+            tipo TEXT,
+            matricula TEXT
         );
     ''')
-    
-    cur.execute('SELECT COUNT(*) FROM usuarios;')
-    if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO usuarios (id, nome, email, senha, tipo) VALUES (1, 'Pedro', 'pedro@ifce.edu.br', 'senha123', 'ALUNO')")
-    
     conn.commit()
     conn.close()
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "Auth Service conectado ao SQLite!"}), 200
+    return jsonify({"status": "Auth Service conectado!"}), 200
 
 
-# ==========================================
-# 🚨 A ROTA DE LOGIN QUE ESTAVA FALTANDO!
-# ==========================================
 @app.route('/api/login', methods=['POST'])
 def login():
     dados = request.get_json()
-    
     if not dados or not dados.get('email') or not dados.get('senha'):
         return jsonify({"erro": "E-mail e senha são obrigatórios"}), 400
 
-    email = dados['email']
-    senha = dados['senha']
-
     conn = get_db_connection()
-    # Busca o usuário no banco
+    # Puxa a matrícula na consulta do login também
     usuario = conn.execute(
-        'SELECT id, nome, email, tipo FROM usuarios WHERE email = ? AND senha = ?', 
-        (email, senha)
+        'SELECT id, nome, email, tipo, matricula FROM usuarios WHERE email = ? AND senha = ?', 
+        (dados['email'], dados['senha'])
     ).fetchone()
     conn.close()
 
     if usuario:
         return jsonify(dict(usuario)), 200
-    else:
-        return jsonify({"erro": "E-mail ou senha incorretos"}), 401
+    return jsonify({"erro": "E-mail ou senha incorretos"}), 401
 
 
 @app.route('/api/users/<int:user_id>', methods=['GET'])
@@ -68,11 +59,9 @@ def get_user(user_id):
     conn = get_db_connection()
     usuario = conn.execute('SELECT * FROM usuarios WHERE id = ?', (user_id,)).fetchone()
     conn.close()
-    
     if usuario:
         return jsonify(dict(usuario)), 200
-    else:
-        return jsonify({"erro": "Usuário não encontrado"}), 404
+    return jsonify({"erro": "Usuário não encontrado"}), 404
 
 
 @app.route('/api/users', methods=['POST'])
@@ -81,19 +70,33 @@ def create_user():
     if not dados or not dados.get('nome') or not dados.get('email'):
         return jsonify({"erro": "Nome e email são obrigatórios"}), 400
 
-    # Se o React enviar uma senha, usa ela. Se não enviar, adota 'senha123'
-    senha_escolhida = dados.get('senha', 'senha123')
+    senha = dados.get('senha', 'senha123')
+    tipo = dados.get('tipo', 'ALUNO').upper()
+    if tipo not in ['ALUNO', 'PROFESSOR']:
+        tipo = 'ALUNO'
+
+    # Captura a matrícula. Se não vier nada, vira string vazia
+    matricula = dados.get('matricula', '').strip()
 
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT INTO usuarios (nome, email, senha, tipo) 
-            VALUES (?, ?, ?, ?)
-        ''', (dados['nome'], dados['email'], senha_escolhida, 'ALUNO'))
+            INSERT INTO usuarios (nome, email, senha, tipo, matricula) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (dados['nome'], dados['email'], senha, tipo, matricula))
         conn.commit()
         novo_id = cursor.lastrowid
-        return jsonify({"mensagem": "Usuário criado!", "id": novo_id, "nome": dados['nome'], "email": dados['email']}), 201
+        
+        return jsonify({
+            "mensagem": "Usuário criado!", 
+            "id": novo_id, 
+            "nome": dados['nome'], 
+            "email": dados['email'],
+            "tipo": tipo,
+            "matricula": matricula
+        }), 201
+
     except sqlite3.IntegrityError: 
         return jsonify({"erro": "Este e-mail já está cadastrado!"}), 409
     except Exception as e:
@@ -102,7 +105,24 @@ def create_user():
         conn.close()
 
 
+# ====================================================
+# 🔍 NOVA ROTA: BUSCA DE USUÁRIO PELA MATRÍCULA
+# ====================================================
+@app.route('/api/users/matricula/<string:mat>', methods=['GET'])
+def get_user_by_matricula(mat):
+    conn = get_db_connection()
+    # Só aceita devolver se o dono da matrícula for do tipo ALUNO
+    usuario = conn.execute(
+        'SELECT id, nome, email, tipo, matricula FROM usuarios WHERE matricula = ? AND tipo = "ALUNO"',
+        (mat.strip(),)
+    ).fetchone()
+    conn.close()
+
+    if usuario:
+        return jsonify(dict(usuario)), 200
+    
+    return jsonify({"erro": "Nenhum Aluno encontrado com a matrícula informada."}), 404
+
 if __name__ == '__main__':
     init_db()
-    # VOLTOU PARA A PORTA 5000 INTERNA DO DOCKER!
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=8081)
