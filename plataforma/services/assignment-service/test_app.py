@@ -2,12 +2,12 @@ import os
 import pytest
 import json
 import sqlite3
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-# Importa a aplicação como um módulo para podermos injetar o DB fake
 import app as assign_app
 
 TEST_DB = '/tmp/test_pytest_assign.db'
+
 
 @pytest.fixture
 def client():
@@ -19,20 +19,16 @@ def client():
 
     with assign_app.app.app_context():
         assign_app.init_db()
-        
-        # 🧪 PLANTANDO AS SEMENTES (Mock de dados relacionais)
+
         conn = sqlite3.connect(TEST_DB)
         cur = conn.cursor()
-        
-        # 1. Criamos a matéria "Cálculo IV" (ID 10) do Prof ID 2
-        cur.execute("INSERT INTO disciplinas (id, nome, professor_id) VALUES (10, 'Cálculo IV', 2)")
-        
-        # 2. Matriculamos o Aluno ID 1 nessa matéria
-        cur.execute("INSERT INTO matriculas (disciplina_id, aluno_id) VALUES (10, 1)")
-        
-        # 3. Passamos uma tarefa pendente para o Aluno ID 1
-        cur.execute("INSERT INTO tarefas (id, usuario_id, disciplina, titulo, status) VALUES (100, 1, 'Cálculo IV', 'Resolver derivadas parciais', 'Pendente')")
-        
+
+        # Tarefa do Aluno ID 1 em Cálculo IV
+        cur.execute("""
+            INSERT INTO tarefas (id, usuario_id, disciplina_id, disciplina, titulo, status)
+            VALUES (100, 1, 10, 'Cálculo IV', 'Resolver derivadas parciais', 'Pendente')
+        """)
+
         conn.commit()
         conn.close()
 
@@ -44,7 +40,7 @@ def client():
 
 
 # ==========================================
-# 🧪 TESTES DE ROTAS BÁSICAS
+# HEALTH CHECK
 # ==========================================
 
 def test_health_check(client):
@@ -54,22 +50,35 @@ def test_health_check(client):
 
 
 # ==========================================
-# 🧪 TESTES COM MOCK DO AUTH SERVICE
+# PAINEL DO ALUNO
 # ==========================================
 
 @patch('app.requests.get')
 def test_get_user_assignments_sucesso(mock_get, client):
-    # Simula o Auth Service respondendo que o Aluno 1 é o Pedro
-    mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {
-        "nome": "Pedro Miguel",
-        "email": "pedro@ifce.edu.br",
-        "matricula": "20261045050012"
-    }
+    # Mock 1: auth-service retorna dados do aluno
+    # Mock 2: academic-service retorna disciplinas matriculadas
+    def side_effect(url, timeout=5):
+        mock = MagicMock()
+        if 'auth' in url or '8081' in url or f'/api/users/1' in url:
+            mock.status_code = 200
+            mock.ok = True
+            mock.json.return_value = {
+                "nome": "Pedro Miguel",
+                "email": "pedro@ifce.edu.br",
+                "matricula": "20261045050012"
+            }
+        else:
+            # academic-service retorna disciplinas
+            mock.status_code = 200
+            mock.ok = True
+            mock.json.return_value = [{"id": 10, "nome": "Cálculo IV"}]
+        return mock
+
+    mock_get.side_effect = side_effect
 
     resposta = client.get('/api/assignments/1')
     assert resposta.status_code == 200
-    
+
     dados = json.loads(resposta.data)
     assert dados["aluno"] == "Pedro Miguel"
     assert "Cálculo IV" in dados["disciplinas"]
@@ -80,62 +89,80 @@ def test_get_user_assignments_sucesso(mock_get, client):
 @patch('app.requests.get')
 def test_get_user_assignments_aluno_inexistente(mock_get, client):
     mock_get.return_value.status_code = 404
+    mock_get.return_value.ok = False
 
     resposta = client.get('/api/assignments/999')
     assert resposta.status_code == 404
-    
-    # CORRIGIDO: Agora ele procura "encontrado" dentro de "Usuário não encontrado."
     assert "encontrado" in json.loads(resposta.data)["erro"]
 
+
 # ==========================================
-# 🧪 TESTES DO MOTOR DE TURMAS E LMS
+# BROADCAST DE TAREFA
 # ==========================================
 
-def test_criar_disciplina_sucesso(client):
-    payload = {"nome": "Física Quântica", "professor_id": 2}
-    resposta = client.post('/api/subjects', json=payload)
+@patch('app.requests.get')
+def test_broadcast_tarefa_para_turma(mock_get, client):
+    # academic-service retorna lista de alunos da disciplina 10
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.ok = True
+    mock_get.return_value.json.return_value = [1, 2, 3]  # 3 alunos
+
+    payload = {
+        "disciplina_id": "10",
+        "disciplina_nome": "Cálculo IV",
+        "titulo": "Lista de Integrais Triplas"
+    }
+    resposta = client.post('/api/assignments/broadcast', json=payload)
+
     assert resposta.status_code == 201
-    assert "criada com sucesso" in json.loads(resposta.data)["mensagem"]
-
-
-def test_proibir_criar_disciplina_com_nome_repetido(client):
-    # Tenta recriar Cálculo IV, que já foi plantada na Fixture
-    payload = {"nome": "Cálculo IV", "professor_id": 2}
-    resposta = client.post('/api/subjects', json=payload)
-    assert resposta.status_code == 409
+    assert "3 aluno(s)" in json.loads(resposta.data)["mensagem"]
 
 
 @patch('app.requests.get')
-def test_matricular_aluno_pela_matricula_com_sucesso(mock_get, client):
-    # O professor digita a matrícula '2026999'. 
-    # Simulamos o Auth Service traduzindo isso para o "Aluno ID 5 (Ana)"
+def test_broadcast_turma_vazia(mock_get, client):
+    # academic-service retorna lista vazia
     mock_get.return_value.status_code = 200
-    mock_get.return_value.json.return_value = {"id": 5, "nome": "Ana Beatriz"}
+    mock_get.return_value.ok = True
+    mock_get.return_value.json.return_value = []
 
-    payload = {"disciplina_id": 10, "matricula": "2026999"}
-    resposta = client.post('/api/subjects/enroll', json=payload)
-    
-    assert resposta.status_code == 201
-    assert "Ana Beatriz" in json.loads(resposta.data)["mensagem"]
-
-
-def test_broadcast_de_tarefa_para_a_turma(client):
-    # Dispara uma tarefa para a disciplina 10 (Cálculo IV), onde o Aluno 1 está sentado
-    payload = {"disciplina_id": 10, "titulo": "Lista de Integrais Triplas"}
+    payload = {
+        "disciplina_id": "10",
+        "disciplina_nome": "Cálculo IV",
+        "titulo": "Tarefa Sem Alunos"
+    }
     resposta = client.post('/api/assignments/broadcast', json=payload)
-    
-    assert resposta.status_code == 201
-    assert "1 aluno(s)" in json.loads(resposta.data)["mensagem"]
+    assert resposta.status_code == 400
 
 
-def test_aluno_concluir_tarefa(client):
-    # A tarefa 100 nasceu como 'Pendente' na Fixture. Vamos entregá-la!
+def test_broadcast_sem_campos_obrigatorios(client):
+    resposta = client.post('/api/assignments/broadcast', json={"titulo": "Sem disciplina"})
+    assert resposta.status_code == 400
+
+
+# ==========================================
+# ENTREGAR TAREFA
+# ==========================================
+
+def test_aluno_entregar_tarefa(client):
     resposta = client.patch('/api/assignments/100/status')
     assert resposta.status_code == 200
-    
-    # Fazemos um SELECT direto no SQLite de teste para provar que a string mudou
+
+    # Confirma direto no banco que o status mudou
     conn = sqlite3.connect(TEST_DB)
-    status_banco = conn.execute("SELECT status FROM tarefas WHERE id = 100").fetchone()[0]
+    status = conn.execute("SELECT status FROM tarefas WHERE id = 100").fetchone()[0]
     conn.close()
-    
-    assert status_banco == "Entregue"
+
+    assert status == "Entregue"
+
+
+def test_entregar_tarefa_inexistente(client):
+    # Deve retornar 200 mesmo sem achar (UPDATE não lança erro no SQLite)
+    # mas nenhuma linha é afetada — comportamento esperado documentado aqui
+    resposta = client.patch('/api/assignments/999/status')
+    assert resposta.status_code == 200
+
+
+# ==========================================
+# IMPORT NECESSÁRIO PARA O SIDE EFFECT
+# ==========================================
+from unittest.mock import MagicMock
