@@ -2,6 +2,10 @@ services:
   frontend-web:
     build: 
       context: ../services/frontend-web
+      args:
+        VITE_AUTH_API: http://localhost:8081
+        VITE_ACADEMIC_API: http://localhost:8082
+        VITE_ASSIGN_API: http://localhost:8083
     ports:
       - "8080:80" 
     depends_on:
@@ -10,16 +14,21 @@ services:
   auth-service:
     build: ../services/auth-service
     ports:
-      - "8081:8081"  
+      - "8081:8081"
 
   academic-service:
     build: 
       context: ../services/academic-service
     ports:
       - "8082:8082"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8081   # ← nome do container, não localhost
 
   assignment-service:
     build: 
       context: ../services/assignment-service
     ports:
       - "8083:8083"
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8081       # ← idem
+      - ACADEMIC_SERVICE_URL=http://academic-service:8082  # ← idem

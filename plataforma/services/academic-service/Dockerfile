@@ -1,4 +1,7 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM python:3.9-slim
 WORKDIR /app
-# Comando genérico apenas para manter o container rodando na Sprint 1
-CMD ["java", "-version", "&&", "sleep", "3600"]
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8082
+CMD ["python", "app.py"]
