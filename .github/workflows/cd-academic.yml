@@ -1,0 +1,23 @@
+name: CD - Academic Service
+
+on:
+  push:
+    branches: [ "main" ]
+    # A esteira só roda se houver alterações nesta pasta específica:
+    paths:
+      - 'plataforma/services/academic-service/**'
+
+jobs:
+  deploy-academic:
+    name: 🚀 Deploy Academic Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🌐 Disparar Webhook no Render
+        run: |
+          if [ -z "${{ secrets.RENDER_HOOK_ACADEMIC }}" ]; then
+            echo "Erro: URL do Webhook não configurada no GitHub Secrets."
+            exit 1
+          fi
+          curl -X POST ${{ secrets.RENDER_HOOK_ACADEMIC }}
+          echo "Deploy do Academic Service disparado com sucesso no Render!"
