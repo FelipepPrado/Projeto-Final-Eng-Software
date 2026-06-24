@@ -2,6 +2,8 @@
 
 Plataforma web para gestão de disciplinas, turmas, matrículas e atividades acadêmicas, desenvolvida com arquitetura de microsserviços. Professores podem criar turmas, matricular alunos e disparar atividades. Alunos acompanham e entregam suas tarefas por um portal dedicado.
 
+🔗 **Acesse em produção:** [https://frontend-web-z8nz.onrender.com](https://frontend-web-z8nz.onrender.com)
+
 ---
 
 ## 🏗️ Arquitetura
