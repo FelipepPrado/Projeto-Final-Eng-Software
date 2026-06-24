@@ -19,7 +19,6 @@ jobs:
           python-version: '3.9'
           
       - name: Instalar dependências e Lint (Auth)
-        # Atenção: Ajuste o caminho se a raiz do Git for a própria pasta plataforma
         working-directory: ./plataforma/services/auth-service
         run: |
           python -m pip install --upgrade pip
@@ -28,7 +27,29 @@ jobs:
           
       - name: Rodar Testes Unitários (Auth)
         working-directory: ./plataforma/services/auth-service
-        run: pytest -v
+        run: pytest test_auth_service.py -v
+
+  test-academic-service:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+        
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Instalar dependências e Lint (Academic)
+        working-directory: ./plataforma/services/academic-service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt flake8 pytest
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          
+      - name: Rodar Testes Unitários (Academic)
+        working-directory: ./plataforma/services/academic-service
+        run: pytest test_academic_service.py -v
 
   test-assignment-service:
     runs-on: ubuntu-latest
@@ -50,22 +71,4 @@ jobs:
           
       - name: Rodar Testes Unitários (Assignment)
         working-directory: ./plataforma/services/assignment-service
-        # Executa os testes caso você já tenha criado o arquivo test_app.py neste serviço também
-        run: pytest -v
-
-  # Se o projeto Java ainda não tiver o pom.xml e os testes criados, remova este bloco
-  test-academic-service:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v3
-        
-      - name: Configurar Java 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          
-      - name: Construir e Testar (Maven)
-        working-directory: ./plataforma/services/academic-service
-        run: mvn clean test
+        run: pytest test_assignment_service.py -v
