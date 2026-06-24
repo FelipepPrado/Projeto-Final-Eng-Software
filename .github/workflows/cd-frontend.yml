@@ -1,0 +1,17 @@
+name: CD - Frontend Service
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'plataforma/services/frontend-web/**' # Vigia apenas esta pasta!
+
+jobs:
+  # Opcional: Você pode manter o passo de `npm run build` aqui antes do deploy
+  # para garantir que não vai mandar código quebrado pro Render.
+  deploy-frontend:
+    name: 🚀 Deploy Frontend Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Webhook no Render
+        run: curl -X POST ${{ secrets.RENDER_HOOK_FRONTEND }}

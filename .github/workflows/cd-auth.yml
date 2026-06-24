@@ -1,0 +1,15 @@
+name: CD - Auth Service
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'plataforma/services/auth-service/**' # Vigia apenas esta pasta!
+
+jobs:
+  deploy-auth:
+    name: 🚀 Deploy Auth Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar Webhook no Render
+        run: curl -X POST ${{ secrets.RENDER_HOOK_AUTH }}
